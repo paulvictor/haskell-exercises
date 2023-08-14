@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 module Exercises where
 
 
@@ -362,8 +363,45 @@ data DirtyExpr
   | DirtyIntValue  Int
   | DirtyBoolValue Bool
 
+data Typed where
+  IntType :: Expr Int -> Typed
+  BoolType :: Expr Bool -> Typed
+
+tidy :: DirtyExpr -> Maybe Typed
+tidy (DirtyEquals x y) = case (tidy x, tidy y) of
+  (Just (IntType x), Just (IntType y)) -> Just (BoolType (Equals x y))
+  _                                    -> Nothing
+
+tidy (DirtyAdd x y) = case (tidy x, tidy y) of
+  (Just (IntType x), Just (IntType y)) -> Just (IntType (Add x y))
+  _                                    -> Nothing
+
+tidy (DirtyIf p t f) = case (tidy p, tidy t, tidy f) of
+  (Just (BoolType p'), Just (IntType t'), Just (IntType f')) ->
+    Just (IntType (If p' t' f'))
+  (Just (BoolType p'), Just (BoolType t'), Just (BoolType f')) ->
+    Just (BoolType (If p' t' f'))
+
+tidy (DirtyIntValue  x) = Just (IntType  (IntValue  x))
+tidy (DirtyBoolValue x) = Just (BoolType (BoolValue x))
+
 parse :: DirtyExpr -> Maybe (Expr Int)
-parse = error "Implement me"
+parse dexp = case tidy dexp of
+  (Just (IntType expr)) -> Just expr
+  _ -> Nothing
+-- parse' :: DirtyExpr -> Maybe (Expr Int)
+-- parse' = \case
+--   DirtyEquals _ _ -> Nothing
+--   DirtyAdd lhsExpr rhsExpr ->
+--     case (parse lhsExpr,parse rhsExpr) of
+--       (Just (IntValue i1), Just (IntValue i2)) ->
+--         Just (Add (IntValue i1) (IntValue i2))
+--       _  -> Nothing
+--   DirtyIf condExpr thenExpr elseExpr ->
+--     case (parse condExpr, parse thenExpr, parse elseExpr) of
+--       (Just (BoolValue b1), Just (IntValue i1), Just (IntValue i2)) ->
+--         Just (If (BoolValue b1) (IntValue i1) (IntValue i2))
+--       _  -> Nothing
 
 -- | c. Can we add functions to our 'Expr' language? If not, why not? What
 -- other constructs would we need to add? Could we still avoid 'Maybe' in the
@@ -384,6 +422,8 @@ parse = error "Implement me"
 -- long as the input of one lines up with the output of the next.
 
 data TypeAlignedList a b where
+  NilTAL :: TypeAlignedList a a
+  ConsTAL :: (c -> b) -> TypeAlignedList b a -> TypeAlignedList c a
   -- ...
 
 -- | b. Which types are existential?
@@ -392,5 +432,7 @@ data TypeAlignedList a b where
 -- not as difficult as you'd initially think.
 
 composeTALs :: TypeAlignedList b c -> TypeAlignedList a b -> TypeAlignedList a c
-composeTALs = error "Implement me, and then celebrate!"
+composeTALs NilTAL x = x
+composeTALs x NilTAL = x
+composeTALs gs (ConsTAL f fs) = ConsTAL f (composeTALs gs fs)
 
