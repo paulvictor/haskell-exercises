@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+
 {- Now that we're experts in GADTs, today's -} module {- will be a /very/ short
 rationale for -} FlexibleInstances {- and -} where {- we need them. -}
 
