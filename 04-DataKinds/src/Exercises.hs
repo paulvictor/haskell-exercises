@@ -1,9 +1,11 @@
 {-# LANGUAGE DataKinds      #-}
 {-# LANGUAGE GADTs          #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
 module Exercises where
 
-import Data.Kind (Type)
+import Data.Kind (Type, Constraint)
 import Data.Function ((&))
 
 
@@ -20,8 +22,18 @@ data IntegerMonoid = Sum | Product
 
 -- | a. Write a newtype around 'Integer' that lets us choose which instance we
 -- want.
+newtype IntWithMonoid (m :: IntegerMonoid) = IntWithMonoid Int
 
 -- | b. Write the two monoid instances for 'Integer'.
+instance Semigroup (IntWithMonoid 'Sum) where
+  (<>) (IntWithMonoid i) (IntWithMonoid j) = IntWithMonoid (i+j)
+instance Monoid (IntWithMonoid 'Sum) where
+  mempty = IntWithMonoid 0
+
+instance Semigroup (IntWithMonoid 'Product) where
+  (<>) (IntWithMonoid i) (IntWithMonoid j) = IntWithMonoid (i*j)
+instance Monoid (IntWithMonoid 'Product) where
+  mempty = IntWithMonoid 1
 
 -- | c. Why do we need @FlexibleInstances@ to do this?
 
@@ -57,9 +69,19 @@ data Void -- No constructors!
 data Nat = Z | S Nat
 
 data StringAndIntList (stringCount :: Nat) where
+  NilSI  :: StringAndIntList Z
+  WithString :: String -> StringAndIntList x -> StringAndIntList (S x)
+  WithInt :: Int -> StringAndIntList x -> StringAndIntList x
   -- ...
 
 -- | b. Update it to keep track of the count of strings /and/ integers.
+data Tuple a = Tuple a a
+
+data StringAndIntList' (stringAndIntCount :: Tuple Nat) where
+  NilSI'  :: StringAndIntList' ('Tuple Z Z)
+  WithString' :: String -> StringAndIntList' ('Tuple x y) -> StringAndIntList' ('Tuple x (S y))
+  WithInt' :: Int -> StringAndIntList' ('Tuple x y) -> StringAndIntList' ('Tuple (S x) y)
+  -- ...
 
 -- | c. What would be the type of the 'head' function?
 
@@ -79,15 +101,23 @@ data Showable where
 -- stores this fact in the type-level.
 
 data MaybeShowable (isShowable :: Bool) where
+  NotShowable :: a -> MaybeShowable 'False
+  Showable' :: Show a => a -> MaybeShowable 'True
   -- ...
 
 -- | b. Write a 'Show' instance for 'MaybeShowable'. Your instance should not
 -- work unless the type is actually 'show'able.
 
+instance Show (MaybeShowable 'True) where
+  show (Showable' a) = show a
+
 -- | c. What if we wanted to generalise this to @Constrainable@, such that it
 -- would work for any user-supplied constraint of kind 'Constraint'? How would
 -- the type change? What would the constructor look like? Try to build this
 -- type - GHC should tell you exactly which extension you're missing.
+
+data Constrainable (k :: Type -> Constraint) where
+  Constrainable :: (k a) => a -> Constrainable k
 
 
 
@@ -105,12 +135,14 @@ data List a = Nil | Cons a (List a)
 -- having a list of types!
 
 data HList (types :: List Type) where
-  -- HNil  :: ...
-  -- HCons :: ...
+  HNil  :: HList 'Nil
+  HCons :: a -> HList as -> HList ('Cons a as)
 
 -- | b. Write a well-typed, 'Maybe'-less implementation for the 'tail' function
 -- on 'HList'.
 
+tail :: HList ('Cons a as) -> HList as
+tail (HCons _ xs) = xs
 -- | c. Could we write the 'take' function? What would its type be? What would
 -- get in our way?
 
@@ -134,11 +166,18 @@ data BlogAction
 -- Remember that, by switching on @DataKinds@, we have access to a promoted
 -- version of 'Bool'!
 
+data BlogAction' (adminOnly :: Bool) where
+  AddBlog' :: BlogAction' 'False
+  DeleteBlog' :: BlogAction' 'True
+  AddComment' :: BlogAction' 'False
+  DeleteComment' :: BlogAction' 'True
+
 -- | b. Write a 'BlogAction' list type that requires all its members to be
 -- the same "access level": "admin" or "non-admin".
 
--- data BlogActionList (isSafe :: ???) where
---   ...
+newtype BlogActionList (isSafe :: Bool) =
+  BlogActionList [BlogAction' isSafe]
+
 
 -- | c. Let's imagine that our requirements change, and 'DeleteComment' is now
 -- available to a third role: moderators. Could we use 'DataKinds' to introduce
@@ -166,12 +205,15 @@ data SBool (value :: Bool) where
 -- | a. Write a singleton type for natural numbers:
 
 data SNat (value :: Nat) where
+  SZ :: SNat Z
+  SS :: SNat n -> SNat (S n)
   -- ...
 
 -- | b. Write a function that extracts a vector's length at the type level:
 
-length :: Vector n a -> SNat n
-length = error "Implement me!"
+length' :: Vector n a -> SNat n
+length' VNil = SZ
+length' (VCons x xs) = SS (length' xs)
 
 -- | c. Is 'Proxy' a singleton type?
 
@@ -249,11 +291,15 @@ data Vector (n :: Nat) (a :: Type) where
 -- into Z and S cases. That's all the hint you need :)
 
 data SmallerThan (limit :: Nat) where
+  SmallerZ :: SmallerThan (S x)
+  SmallerS :: SmallerThan s -> SmallerThan (S s)
+
   -- ...
 
 -- | b. Write the '(!!)' function:
 
 (!!) :: Vector n a -> SmallerThan n -> a
-(!!) = error "Implement me!"
+(!!) (VCons x VNil) SmallerZ = x
+(!!) (VCons x xs) (SmallerS ss) = (Exercises.!!) xs ss
 
 -- | c. Write a function that converts a @SmallerThan n@ into a 'Nat'.
