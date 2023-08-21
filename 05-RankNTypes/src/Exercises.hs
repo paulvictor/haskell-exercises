@@ -20,8 +20,9 @@ data Exlistential where
 
 -- | a. Write a function to "unpack" this exlistential into a list.
 
--- unpackExlistential :: Exlistential -> (forall a. a -> r) -> [r]
--- unpackExlistential = error "Implement me!"
+unpackExlistential :: Exlistential -> (forall a. a -> r) -> [r]
+unpackExlistential Nil _ = []
+unpackExlistential (Cons x xs) f = f x : (unpackExlistential xs f)
 
 -- | b. Regardless of which type @r@ actually is, what can we say about the
 -- values in the resulting list?
@@ -42,13 +43,17 @@ data CanFold a where
 
 -- | a. The following function unpacks a 'CanFold'. What is its type?
 
--- unpackCanFold :: ???
--- unpackCanFold f (CanFold x) = f x
+unpackCanFold :: (forall f. Foldable f => f a -> r) -> CanFold a -> r
+unpackCanFold f (CanFold x) = f x
 
 -- | b. Can we use 'unpackCanFold' to figure out if a 'CanFold' is "empty"?
 -- Could we write @length :: CanFold a -> Int@? If so, write it!
+isEmpty = unpackCanFold null
+l = unpackCanFold length
 
 -- | c. Write a 'Foldable' instance for 'CanFold'. Don't overthink it.
+instance Foldable CanFold where
+  foldr f init (CanFold fa) = foldr f init fa
 
 
 
@@ -63,9 +68,13 @@ data EqPair where
 
 -- | a. Write a function that "unpacks" an 'EqPair' by applying a user-supplied
 -- function to its pair of values in the existential type.
+unpackEqPair :: (forall a. Eq a => a -> a -> r) -> EqPair -> r
+unpackEqPair f (EqPair a b) = f a b
 
 -- | b. Write a function that takes a list of 'EqPair's and filters it
 -- according to some predicate on the unpacked values.
+filterEqPair :: (forall a. a -> a -> Bool) -> [EqPair] ->  [EqPair]
+filterEqPair f = filter (\(EqPair a b) -> f a b)
 
 -- | c. Write a function that unpacks /two/ 'EqPair's. Now that both our
 -- variables are in rank-2 position, can we compare values from different
@@ -97,6 +106,7 @@ data Nested input output subinput suboutput
 -- | a. Write a GADT to existentialise @subinput@ and @suboutput@.
 
 data NestedX input output where
+  NestedX :: Component subinput suboutput -> (input -> subinput) -> (suboutput -> output) -> NestedX input output
   -- ...
 
 -- | b. Write a function to "unpack" a NestedX. The user is going to have to
