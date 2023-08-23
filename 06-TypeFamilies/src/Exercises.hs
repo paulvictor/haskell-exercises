@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs         #-}
 {-# LANGUAGE TypeFamilies  #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Exercises where
 
 import Data.Kind (Constraint, Type)
@@ -21,9 +22,17 @@ data Nat = Z | S Nat
 
 -- | a. Use the @TypeOperators@ extension to rewrite the 'Add' family with the
 -- name '+':
+type family (+) (x :: Nat) (y :: Nat) :: Nat where
+  Z + x = x
+  S x + y = S (x + y)
 
 -- | b. Write a type family '**' that multiplies two naturals using '(+)'. Which
 -- extension are you being told to enable? Why?
+type family (**) (x :: Nat) (y :: Nat) :: Nat where
+  Z ** x = Z
+  S x ** y = y + (x ** y)
+  x ** S y = x + (x ** y)
+
 
 data SNat (value :: Nat) where
   SZ :: SNat 'Z
@@ -31,6 +40,9 @@ data SNat (value :: Nat) where
 
 -- | c. Write a function to add two 'SNat' values.
 
+addSNat :: SNat i -> SNat j -> SNat (i + j)
+addSNat SZ x = x
+addSNat (SS x) y = SS (addSNat x y)
 
 
 
@@ -44,14 +56,17 @@ data Vector (count :: Nat) (a :: Type) where
 -- | a. Write a function that appends two vectors together. What would the size
 -- of the result be?
 
--- append :: Vector m a -> Vector n a -> Vector ??? a
+append :: Vector m a -> Vector n a -> Vector (m+n) a
+append VNil x = x
+append (VCons x xs) y = VCons x (append xs y)
 
 -- | b. Write a 'flatMap' function that takes a @Vector n a@, and a function
 -- @a -> Vector m b@, and produces a list that is the concatenation of these
 -- results. This could end up being a deceptively big job.
 
--- flatMap :: Vector n a -> (a -> Vector m b) -> Vector ??? b
-flatMap = error "Implement me!"
+flatMap :: Vector n a -> (a -> Vector m b) -> Vector (n ** m) b
+flatMap VNil f = VNil
+flatMap (VCons x xs) f = append (f x) (flatMap xs f)
 
 
 
@@ -60,8 +75,15 @@ flatMap = error "Implement me!"
 {- THREE -}
 
 -- | a. More boolean fun! Write the type-level @&&@ function for booleans.
+type family (&&) (a :: Bool) (b :: Bool) :: Bool where
+  'False && x = False
+  'True && x = x
 
 -- | b. Write the type-level @||@ function for booleans.
+type family (||) (a :: Bool) (b :: Bool) :: Bool where
+  'True || x = True
+  'False || x = x
+
 
 -- | c. Write an 'All' function that returns @'True@ if all the values in a
 -- type-level list of boleans are @'True@.

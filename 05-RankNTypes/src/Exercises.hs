@@ -193,7 +193,8 @@ data SNat (n :: Nat) where
 -- | We also saw that we could convert from an 'SNat' to a 'Nat':
 
 toNat :: SNat n -> Nat
-toNat = error "You should already know this one ;)"
+toNat SZ = Z
+toNat (SS snat) = S (toNat snat)
 
 -- | How do we go the other way, though? How do we turn a 'Nat' into an 'SNat'?
 -- In the general case, this is impossible: the 'Nat' could be calculated from
@@ -209,6 +210,9 @@ toNat = error "You should already know this one ;)"
 -- | If you're looking for a property that you could use to test your function,
 -- remember that @fromNat x toNat === x@!
 
+fromNat :: Nat -> (forall n. SNat n -> r) -> r
+fromNat Z f = f SZ
+fromNat (S n) f = fromNat n (f . SS)
 
 
 
@@ -224,3 +228,7 @@ data Vector (n :: Nat) (a :: Type) where
 -- | It would be nice to have a 'filter' function for vectors, but there's a
 -- problem: we don't know at compile time what the new length of our vector
 -- will be... but has that ever stopped us? Make it so!
+filterV :: (a -> Bool) -> Vector n a -> (forall m. Vector m a -> r) -> r
+filterV pred VNil f = f VNil
+filterV pred (VCons a as) f =
+  filterV pred as (if pred a then f . VCons a else f)
